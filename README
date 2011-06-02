@@ -9,7 +9,7 @@ To run this code, you need three additional thing:
 
 Once you have them, you run it like:
 
-java -mx150m wordcompletions.WordCompletionModel prior-unigrams.txt sms-ngrams.txt
+java -mx200m -cp .:stanford-corenlp-2011-04-22.jar keyboard.wordcompletions.WordCompletionModel prior-unigrams.txt sms-ngrams.txt
 
 You will get a prompt >>
 
