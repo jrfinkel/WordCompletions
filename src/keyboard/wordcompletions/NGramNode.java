@@ -1,84 +1,84 @@
 package keyboard.wordcompletions;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import edu.stanford.nlp.stats.ClassicCounter;
+import edu.stanford.nlp.stats.Counter;
+import edu.stanford.nlp.stats.Counters;
+
 public class NGramNode {
 
+	final public String ngram;
+	private Counter<String> wordCounts = new ClassicCounter<String>();	
 	final private Map<String,NGramNode> children = new HashMap<String,NGramNode>();
-	private double score = 0;
 	
-	public double score() { return score; }
-
-	public void finishSetup() {
-		//if (score == 0) { score = 0; }
-		//else { score = 1 + Math.log(1 + Math.log(score)); }
-	
-		for (NGramNode n : children.values()) {
-			n.finishSetup();
-		}
+	public String toString() {
+		return ngram+" --> "+wordCounts;
 	}
 	
-	public void addNGram(LinkedList<String> prevWords, double count) {
-		
-		if (prevWords.isEmpty()) {
-			this.score += count;
-		} else {
-			String prevWord = prevWords.poll();
+	public NGramNode (String ngram) {
+		this.ngram = ngram;
+	}
+	
+	public NGramNode getChild(String word) {
+		return children.get(word);
+	}
+	
+	public double getCount(String word) {
+		return wordCounts.getCount(word);
+	}
+	
+	public double totalCount() {
+		return wordCounts.totalCount();
+	}
+	
+	public Counter<String> getWordCounts() {
+		return new ClassicCounter(wordCounts);
+	}
+	
+	public void addNGram(String word, LinkedList<String> prevWords, double count) {
+		wordCounts.incrementCount(word, count);
+
+		if (!prevWords.isEmpty()) {
+			String prevWord = prevWords.removeLast();
 			NGramNode child = children.get(prevWord);
 			if (child == null) {
-				child = new NGramNode();
+				child = new NGramNode(prevWord+" "+ngram);
 				children.put(prevWord,child);
 			}
-			child.addNGram(prevWords, count);
+			child.addNGram(word, prevWords, count);
 		}
 	}
 	
-	public double prune(double threshold) {
-		
-		double score = this.score;
-		
-		Set<String> toRemove = new HashSet<String>();
-		for (String word : children.keySet()) {
-			NGramNode n = children.get(word);
-			double s = n.prune(threshold);
-			if (s <= threshold) { toRemove.add(word); }
-			else { score += s; }
+	public Counter<String> getScores(Set<String> possibleWords, LinkedList<String> prevWords) {
+		Counter<String> scores = new ClassicCounter<String>();
+		if (possibleWords.isEmpty()) {
+			scores.addAll(wordCounts);
 		}
 		
-		for (String word : toRemove) {
-			children.remove(word);
+		for (String word : possibleWords) {
+			scores.incrementCount(word, getCount(word));
 		}
 		
-		if (threshold > 1.0) {
-			score /= threshold;
+		if (scores.totalCount() > 0.0) {
+			Counters.normalize(scores);
+		} else {
+			return scores;			
 		}
 		
-		return score;
-	}
-	
-	Object scoreCacheKey = null;
-	double scoreCacheVal = 0.0;
-	
-	public double getScore(List<String> prevWords, int pos) {
+		if (prevWords.isEmpty()) { return scores; }
+		String w = prevWords.removeLast();	
+
+		NGramNode node = getChild(w);
+
+		if (node == null) { return scores; }	
+
+		scores.addAll(node.getScores(possibleWords, prevWords));
 		
-		double score = this.score;
-		
-		if (pos < prevWords.size()) {
-			String prevWord = prevWords.get(pos);
-			NGramNode child = children.get(prevWord);
-			if (child != null) {
-				double cScore = child.getScore(prevWords, pos+1);
-				//System.out.print(prevWord+" ("+cScore+") --> ( + "+count+" = ) ");
-				score += cScore;
-			}
-		}
-		
-		return score;
+		return scores;
 	}
 	
 }

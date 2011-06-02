@@ -6,78 +6,73 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
+import edu.stanford.nlp.stats.ClassicCounter;
 import edu.stanford.nlp.stats.Counter;
-import edu.stanford.nlp.stats.TwoDimensionalCounter;
+import edu.stanford.nlp.stats.Counters;
 
 public class NGramModel {
 
-	final private Map<String,NGramNode> children = new HashMap<String,NGramNode>();
-	final private TwoDimensionalCounter<String,String> bigrams = new TwoDimensionalCounter<String,String>();
+	private static Pattern punctPattern = Pattern.compile("(\\p{Punct})");
 	
-	public void addNGram(LinkedList<String> words, double score) {
-	
-		String word = words.poll();
-		
-		if (words.size() == 1) {
-			String prevWord = words.peek();
-			bigrams.incrementCount(prevWord, word, score);
+	public static LinkedList<String> processLine(String line, boolean inApp) {
+		line = line.trim();
+		if (inApp) {
+			line = punctPattern.matcher(line).replaceAll(" $1 ");
 		}
-		
-		NGramNode child = children.get(word);
-		if (child == null) {
-			child = new NGramNode();
-			children.put(word,child);
-		}
-		child.addNGram(words, score);
-		
-	}
-
-	public Counter<String> getBigramPrediction(String prevWord) {
-		return bigrams.getCounter(prevWord);
-	}
-	
-	public void prune(double threshold) {		
-		Set<String> toRemove = new HashSet();
-		for (String word : children.keySet()) {
-			NGramNode n = children.get(word);
-			double s = n.prune(threshold);
-			if (s < threshold) { toRemove.add(word); }
-		}
-		for (String n : toRemove) {
-			children.remove(n);
-		}
-		System.out.println();
-	}
-	
-	public double getScore(String word, List<String> prevWords) {
-		NGramNode n = children.get(word);
-		if (n == null) { return 0.0; }
-		else { 
-			double score = n.getScore(prevWords, 0); 
-			//System.out.println(" [[ "+word+" / "+score+" ]] ");
-			return score;
-		}
-	}
-	
-	public static LinkedList<String> processLine(String line) {
 		String[] words = line.split("\\s+");
 		
 		LinkedList<String> output = new LinkedList<String>();
-		for (int i = words.length-1; i >= 0; i--) {
-			output.add(words[i]);
+		if (inApp) { output.add("<BOT>"); }
+		for (String word : words) {
+			if (word.length() > 0) {
+				output.addLast(word);
+			}
 		}
 		
 		return output;
+	}
+	
+	final private Map<String,NGramNode> bigrams = new HashMap<String,NGramNode>();
+	
+	private void addNGram(LinkedList<String> words, double score) {
+	
+		String word = words.pollLast();		
+		String prevWord = words.pollLast();
+		
+		if (prevWord != null) {
+			NGramNode child = bigrams.get(prevWord);
+			if (child == null) {
+				child = new NGramNode(prevWord);
+				bigrams.put(prevWord,child);
+			}
+			child.addNGram(word, words, score);
+		}
+	}
+
+	public Counter<String> getBigramPrediction(String prevWord) {
+		Counter<String> bigramScores = bigrams.get(prevWord).getWordCounts();
+		Counters.normalize(bigramScores);
+		return bigramScores;
+	}
+	
+	public Counter<String> getScores(Set<String> possibleWords, LinkedList<String> prevWords) {
+		String prevWord = prevWords.removeLast();
+		NGramNode node = bigrams.get(prevWord);
+		if (node == null) { return new ClassicCounter<String>(); }
+		
+		return node.getScores(possibleWords, prevWords);
 	}	
 	
-	public static NGramModel getModel(String modelFile) throws IOException {
+	public static NGramModel getModel(String modelFile, WordCompletionModel unigramModel) throws IOException {
 		NGramModel model = new NGramModel();
 		
 		BufferedReader in = new BufferedReader(new FileReader(new File(modelFile)));
@@ -86,40 +81,28 @@ public class NGramModel {
 			if (line.trim().length() == 0) { continue; }
 			String[] bits = line.trim().split("\\s+", 2);
 			double score = Double.valueOf(bits[0]);
-			LinkedList<String> words = processLine(bits[1]);
+			LinkedList<String> words = processLine(bits[1], false);
+			if (unigramModel != null) { unigramModel.addCompletion(words.peek(), 1.0); }
 			model.addNGram(words, score);
 		}	
-		in.close();
-	
-		model.prune(1);
-		
-		for (NGramNode n : model.children.values()) {
-			n.finishSetup();
-		}		
-		
-		for (String prevWord : model.bigrams.firstKeySet()) {
-			Counter<String> counts = model.bigrams.getCounter(prevWord);
-			for (String word : counts.keySet()) {
-				model.bigrams.setCount(prevWord, word, 1 + Math.log(1 + Math.log(counts.getCount(word))));
-			}
-		}
-		
+		in.close();	
 		return model;
 	}
 	
 	public static void main(String[] args) throws IOException {
 
-		NGramModel model = getModel(args[0]);
+		NGramModel model = getModel(args[0], null);
 		
 		BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
-		System.out.print(">> ");
+		System.out.print("prev words >> ");
 		String line;
 		while ((line = in.readLine()) != null) {		
-			LinkedList<String> words = processLine(line);
-			String word = words.poll();
-			List<String> prevWords = new ArrayList(words);
-			System.out.println(model.getScore(word, prevWords));
-			System.out.print(">> ");
+			LinkedList<String> prevWords = processLine(line, true);
+			System.out.print("potential words >> ");
+			Set<String> potentialWords = new HashSet<String>(processLine(in.readLine(), false));
+			Counter<String> scores = model.getScores(potentialWords, prevWords);
+			System.out.println(Counters.toSortedListWithCounts(scores));
+			System.out.print("prev words >> ");
 		}
 		
 	}
