@@ -1,0 +1,62 @@
+To run this code, you need three additional thing:
+
+1. this jar file: 
+
+2. this unigram data file from google unigrams:
+
+3. this personalized-to-jenny ngram data file:
+
+
+Once you have them, you run it like:
+
+java -mx150m wordcompletions.WordCompletionModel prior-unigrams.txt sms-ngrams.txt
+
+You will get a prompt >>
+
+Type the beginning of a text message. If you end with a space, then it
+assumes you are about to start a new word, and if it does not end in a
+space then it assumes you are still working on the current word. Press
+enter, and it will return an ordered list of suggestions, along with
+their unnormalized probabilities. Here's an example where it predicts
+the next word entirely:
+
+>> What's yr 
+[(address,0.9222661396574439), (email,0.620641194554238),
+(status,0.603249890206412), (office,0.3277119016249451),
+(favorite,0.301624945103206), (phone,0.216600790513834),
+(gf,0.19920948616600792), (house,0.0782608695652174),
+(place,0.0782608695652174), (not,0.052173913043478265),
+(way,0.043478260869565216), (time,0.017391304347826087),
+(day,0.017391304347826087), (car,0.017391304347826087),
+(voicemail,0.017391304347826087), ...
+
+and one where it tries to complete a word:
+
+>> What t
+[(time,1.8152279513029932), (the,0.23679706873048081),
+(to,0.22925824637465894), (that,0.07919805849703984),
+(thing,0.07516310017441079), (t,0.07438259900714314),
+(theater,0.06885944867600084), (think,0.04059257405482038),
+(there,0.023754044991812346), (this,0.021695054485951208),
+(then,0.019973967038892176), (they,0.017226299409034116),
+(too,0.011724943242072466), (tonight,0.01011775223062395),
+(take,0.009779211347683234), ...
+
+It can also predict how you will start a text:
+
+>> 
+[(I,0.14624846248462484), (Yeah,0.026445264452644522),
+(It,0.018327183271832716), (Also,0.017958179581795818),
+(Ok,0.015621156211562114), (No,0.015252152521525213),
+(What,0.015129151291512913), (Hey,0.014883148831488313),
+(And,0.014637146371463712), (You,0.013776137761377613),
+(Oh,0.013038130381303812), (That,0.012546125461254611),
+(Can,0.011562115621156211), (So,0.01094710947109471),
+(How,0.01070110701107011), ...
+
+
+Right now it is highly tuned to me. I can give you a script to run on
+your text messages to get it customized to you instead.
+
+Also, right now there is no spelling correction, although I do know
+how I want to implement that. 
