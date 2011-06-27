@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+        package="com.android.inputmethod.ngram">
+
+    <!-- <application android:icon="@drawable/app_icon.png" > -->
+    <application>
+
+        <uses-permission android:name="android.permission.VIBRATE"/>
+        <uses-permission android:name="android.permission.READ_USER_DICTIONARY" />
+        <uses-permission android:name="android.permission.WRITE_USER_DICTIONARY" />
+        <uses-permission android:name="android.permission.RECORD_AUDIO" />
+        <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+        <service android:name="NgramLatinIME"
+                android:label="Awesome N-Gram Keyboard"
+                android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data android:name="android.view.im" android:resource="@xml/method" />
+        </service>
+
+    </application>
+</manifest>
+
